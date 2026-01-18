@@ -17,10 +17,11 @@
  *   ANTHROPIC_API_KEY - Fallback for LLM analysis
  */
 
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { readFileSync, existsSync } from 'fs';
-import { extractInsights, storeInsights, log } from './lib/insight-extractor';
+import { spawn } from 'child_process';
+import { log } from './lib/insight-extractor';
 
 // Configuration
 const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.config', 'pai');
@@ -89,19 +90,40 @@ async function main() {
     const projectName = extractProjectName(cwd);
     log(LOG_PREFIX, `Project: ${projectName}`);
 
-    // Extract insights using shared library
-    const insights = await extractInsights(LOG_PREFIX, transcriptPath, projectName);
+    // Spawn background process for insight extraction
+    // This allows the hook to exit quickly while extraction runs asynchronously
+    // (Claude Code enforces a 60-second timeout on hooks)
+    log(LOG_PREFIX, `Spawning background insight extraction for ${projectName}`);
 
-    if (!insights) {
-      log(LOG_PREFIX, 'No insights extracted');
-      process.exit(0);
-    }
+    try {
+      const scriptDir = dirname(new URL(import.meta.url).pathname);
+      let bgScript = join(scriptDir, 'hindsight-extract-insights-bg.ts');
 
-    // Store to Hindsight
-    const stored = await storeInsights(LOG_PREFIX, insights, projectName, sessionId, 'pre-compact-analysis');
+      // Fallback to PAI hooks directory if not found
+      if (!existsSync(bgScript)) {
+        bgScript = join(PAI_DIR, 'hooks', 'hindsight-extract-insights-bg.ts');
+      }
 
-    if (stored) {
-      console.log(`Pre-compact: Extracted and stored insights for ${projectName}`);
+      if (existsSync(bgScript)) {
+        const child = spawn('bun', ['run', bgScript, transcriptPath, projectName, sessionId], {
+          detached: true,
+          stdio: 'ignore',
+          env: {
+            ...process.env,
+            PAI_DIR,
+            HINDSIGHT_PROJECT_URL: process.env.HINDSIGHT_PROJECT_URL || 'http://localhost:8889',
+            HINDSIGHT_PROJECT: process.env.HINDSIGHT_PROJECT || 'project',
+          },
+        });
+
+        child.unref();
+        log(LOG_PREFIX, `Background extraction spawned (PID: ${child.pid})`);
+        console.log(`Pre-compact: Background extraction started for ${projectName}`);
+      } else {
+        log(LOG_PREFIX, `Background script not found at ${bgScript}`);
+      }
+    } catch (spawnError) {
+      log(LOG_PREFIX, `Failed to spawn background extraction: ${spawnError}`);
     }
 
   } catch (error) {
