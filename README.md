@@ -2,7 +2,7 @@
 name: PAI Hindsight Memory
 pack-id: hedley-pai-hindsight-memory-core-v1.1.0
 version: 1.1.0
-author: hedley
+author: Hedley Robertson
 description: Long-term memory integration using Hindsight MCP servers with automatic session context preservation across sessions
 type: skill
 purpose-type: [productivity, automation, memory]
