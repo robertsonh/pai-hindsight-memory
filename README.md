@@ -20,9 +20,9 @@ icon: icons/pai-hindsight-memory.png
 
 You are receiving a PAI Pack - a modular upgrade for AI agent systems.
 
-**What is PAI?** See: [PAI Project Overview](../README.md#what-is-pai)
+**What is PAI?** See: [PAI Project Overview](https://github.com/danielmiessler/PAI#what-is-pai)
 
-**What is a Pack?** See: [Pack System](../README.md#the-journey-pai-v1x--v20)
+**What is a Pack?** See: [Pack System](https://github.com/danielmiessler/PAI#the-journey-pai-v1x--v20)
 
 This pack integrates Hindsight memory servers with PAI to provide persistent memory across sessions. It enables your AI to:
 
