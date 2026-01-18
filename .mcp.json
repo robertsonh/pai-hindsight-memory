@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "hindsight-project": {
+      "type": "http",
+      "url": "http://localhost:8889/mcp/${HINDSIGHT_PROJECT:-pai}/"
+    }
+  }
+}
+
+

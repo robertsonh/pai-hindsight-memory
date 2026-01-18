@@ -1,0 +1,49 @@
+{
+  "_comment": "Hindsight Memory hooks configuration - MERGE with ~/.claude/settings.json",
+  "_instructions": "Add these hooks to your ~/.claude/settings.json hooks section (NOT $PAI_DIR/settings.json)",
+  "_critical": "EVERY hook block MUST include 'matcher': '*' or hooks won't fire!",
+
+  "hooks_to_add": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run $PAI_DIR/hooks/hindsight-session-start.ts",
+            "_source": "pai-hindsight-memory",
+            "_description": "Load project context from Hindsight at session start"
+          }
+        ]
+      }
+    ],
+
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run $PAI_DIR/hooks/hindsight-session-save.ts",
+            "_source": "pai-hindsight-memory",
+            "_description": "Save project context to Hindsight at session end"
+          }
+        ]
+      }
+    ],
+
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run $PAI_DIR/hooks/hindsight-pre-compact.ts",
+            "_source": "pai-hindsight-memory",
+            "_description": "Analyze conversation and extract insights before compaction"
+          }
+        ]
+      }
+    ]
+  }
+}

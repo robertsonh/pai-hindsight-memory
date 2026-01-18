@@ -1,0 +1,36 @@
+{
+  "name": "pai-hindsight-memory",
+  "version": "1.0.0",
+  "description": "Long-term memory integration for PAI using Hindsight MCP servers - automatic context preservation across sessions with separate project and personal memory banks.",
+  "author": "Hedley",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hedley/pai-hindsight-memory"
+  },
+  "keywords": [
+    "pai",
+    "hindsight",
+    "memory",
+    "mcp",
+    "claude",
+    "ai-assistant",
+    "context-preservation"
+  ],
+  "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "INSTALL.md",
+    "VERIFY.md",
+    "UNINSTALL.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test:hooks": "bun test src/hooks/",
+    "verify": "bash -c 'source VERIFY.md'"
+  }
+}
