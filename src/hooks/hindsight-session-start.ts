@@ -312,6 +312,11 @@ function formatProjectContext(
   parts.push('- Use `mcp__hindsight-project__retain` to store project decisions');
   parts.push('- Use `mcp__hindsight-project__reflect` for analysis of past patterns');
   parts.push(`- Use \`mcp__hindsight-${PERSONAL_BANK}__*\` for personal (non-project) memories`);
+  parts.push('');
+  parts.push('## Memory Protocols (IMPORTANT)');
+  parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain`. Do NOT wait.');
+  parts.push('- **Self-Learning:** When you discover something through trial-and-error (commands that fail, correct syntax via --help, non-obvious solutions), IMMEDIATELY store it: "LEARNED: [what failed] → [what works]"');
+  parts.push('- **Debugging:** Before attempting fixes, use `mcp__hindsight-project__reflect` to check for similar past mistakes.');
   parts.push('</project-context>');
 
   return parts.join('\n');

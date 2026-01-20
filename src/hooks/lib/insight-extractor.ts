@@ -7,7 +7,7 @@
  * Part of the pai-hindsight-memory pack.
  */
 
-import { readFileSync, existsSync, appendFileSync } from 'fs';
+import { readFileSync, existsSync, appendFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -19,14 +19,59 @@ const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.config', 'pai');
 const HINDSIGHT_URL = process.env.HINDSIGHT_PROJECT_URL || 'http://localhost:8889';
 const PROJECT_BANK = process.env.HINDSIGHT_PROJECT || 'project';
 
-// LLM Configuration
+// LLM Configuration (vLLM with OpenAI-compatible API)
 const LOCAL_LLM_URL = process.env.LOCAL_LLM_URL || 'http://uber.lan:11434';
-const LOCAL_LLM_MODEL = process.env.LOCAL_LLM_MODEL || 'qwen2.5:32b-instruct-q4_K_M';
+const LOCAL_LLM_MODEL = process.env.LOCAL_LLM_MODEL || 'Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// LLM timeout in milliseconds (default: 10 minutes for slow local models)
+const LOCAL_LLM_TIMEOUT = parseInt(process.env.LOCAL_LLM_TIMEOUT || '600000', 10);
 
-// Chunk size for local LLM (aim for ~20K chars to fit in 32K context with prompt)
-const CHUNK_SIZE = 20000;
+// Chunk size for local LLM (aim for ~10K chars to safely fit in 8K context with prompt + output)
+const CHUNK_SIZE = 10000;
 const CHUNK_OVERLAP = 1000;
+
+// State file for tracking incremental processing
+const STATE_FILE = join(PAI_DIR, 'history', 'precompact-state.json');
+
+// ============================================================================
+// State Management (for incremental processing)
+// ============================================================================
+
+interface ProcessingState {
+  [sessionId: string]: {
+    lastProcessedLine: number;
+    lastProcessedAt: string;
+  };
+}
+
+export function loadProcessingState(): ProcessingState {
+  try {
+    if (existsSync(STATE_FILE)) {
+      return JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+export function saveProcessingState(state: ProcessingState): void {
+  try {
+    writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {}
+}
+
+export function getLastProcessedLine(sessionId: string): number {
+  const state = loadProcessingState();
+  return state[sessionId]?.lastProcessedLine || 0;
+}
+
+export function setLastProcessedLine(sessionId: string, lineNumber: number): void {
+  const state = loadProcessingState();
+  state[sessionId] = {
+    lastProcessedLine: lineNumber,
+    lastProcessedAt: new Date().toISOString(),
+  };
+  saveProcessingState(state);
+}
 
 // ============================================================================
 // Types
@@ -79,17 +124,27 @@ function contentToText(content: unknown): string {
   return '';
 }
 
-export function parseTranscriptForInsights(transcriptPath: string): string {
+export interface ParseResult {
+  content: string;
+  totalLines: number;
+  processedLines: number;
+}
+
+export function parseTranscriptForInsights(transcriptPath: string, startLine: number = 0): ParseResult {
   if (!existsSync(transcriptPath)) {
-    return '';
+    return { content: '', totalLines: 0, processedLines: 0 };
   }
 
   try {
     const content = readFileSync(transcriptPath, 'utf-8');
     const lines = content.split('\n').filter(Boolean);
+    const totalLines = lines.length;
     const conversationParts: string[] = [];
 
-    for (const line of lines) {
+    // Only process lines after startLine (for incremental processing)
+    const linesToProcess = lines.slice(startLine);
+
+    for (const line of linesToProcess) {
       try {
         const entry: TranscriptEntry = JSON.parse(line);
 
@@ -126,9 +181,13 @@ export function parseTranscriptForInsights(transcriptPath: string): string {
       }
     }
 
-    return conversationParts.join('\n\n');
+    return {
+      content: conversationParts.join('\n\n'),
+      totalLines,
+      processedLines: linesToProcess.length,
+    };
   } catch {
-    return '';
+    return { content: '', totalLines: 0, processedLines: 0 };
   }
 }
 
@@ -285,7 +344,8 @@ async function analyzeWithLocalLLM(prompt: string, strictMode: boolean = false):
       model: LOCAL_LLM_MODEL,
       messages,
       temperature: strictMode ? 0.1 : 0.3,
-      max_tokens: 4096,
+      max_tokens: 2048,
+      stream: true,  // Enable streaming to bypass Ollama's 5-minute timeout
     };
 
     // Request JSON format if in strict mode (supported by many OpenAI-compatible APIs)
@@ -293,21 +353,68 @@ async function analyzeWithLocalLLM(prompt: string, strictMode: boolean = false):
       requestBody.response_format = { type: 'json_object' };
     }
 
-    const response = await fetch(`${LOCAL_LLM_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    // Use AbortController for timeout (default 10 minutes for slow local models)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LOCAL_LLM_TIMEOUT);
 
-    if (!response.ok) {
-      return null;
+    try {
+      const response = await fetch(`${LOCAL_LLM_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      // Collect streaming response chunks
+      const reader = response.body?.getReader();
+      if (!reader) {
+        return null;
+      }
+
+      const decoder = new TextDecoder();
+      let content = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        // Parse SSE format: each line starts with "data: " followed by JSON
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (delta) {
+                content += delta;
+              }
+            } catch {
+              // Skip malformed JSON chunks
+            }
+          }
+        }
+      }
+
+      return content || null;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      // Log timeout for debugging
+      log('LLM', `Request timed out after ${LOCAL_LLM_TIMEOUT}ms`);
+    }
     return null;
   }
 }
@@ -327,7 +434,7 @@ async function analyzeWithAnthropic(prompt: string): Promise<string | null> {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        max_tokens: 2048,
         messages: [
           {
             role: 'user',
@@ -458,25 +565,35 @@ function mergeInsights(allInsights: ExtractedInsights[]): ExtractedInsights {
 // Main Export Functions
 // ============================================================================
 
+export interface ExtractionResult {
+  insights: ExtractedInsights | null;
+  totalLines: number;
+  processedLines: number;
+}
+
 /**
  * Extract insights from a transcript file.
  * Handles chunking for large transcripts and merges results.
+ * @param startLine - Line number to start processing from (for incremental extraction)
  */
 export async function extractInsights(
   logPrefix: string,
   transcriptPath: string,
-  projectName: string
-): Promise<ExtractedInsights | null> {
-  const transcript = parseTranscriptForInsights(transcriptPath);
+  projectName: string,
+  startLine: number = 0
+): Promise<ExtractionResult> {
+  const parseResult = parseTranscriptForInsights(transcriptPath, startLine);
 
-  if (!transcript) {
-    log(logPrefix, 'Empty or invalid transcript');
-    return null;
+  if (!parseResult.content) {
+    log(logPrefix, startLine > 0
+      ? `No new content since line ${startLine} (total lines: ${parseResult.totalLines})`
+      : 'Empty or invalid transcript');
+    return { insights: null, totalLines: parseResult.totalLines, processedLines: 0 };
   }
 
-  log(logPrefix, `Transcript parsed: ${transcript.length} characters`);
+  log(logPrefix, `Transcript parsed: ${parseResult.content.length} characters (lines ${startLine + 1}-${parseResult.totalLines})`);
 
-  const chunks = chunkTranscript(transcript);
+  const chunks = chunkTranscript(parseResult.content);
   log(logPrefix, `Transcript split into ${chunks.length} chunks`);
 
   const allInsights: ExtractedInsights[] = [];
@@ -492,7 +609,7 @@ export async function extractInsights(
 
   if (allInsights.length === 0) {
     log(logPrefix, 'No insights extracted from any chunk');
-    return null;
+    return { insights: null, totalLines: parseResult.totalLines, processedLines: parseResult.processedLines };
   }
 
   const merged = mergeInsights(allInsights);
@@ -503,10 +620,10 @@ export async function extractInsights(
 
   if (totalInsights === 0) {
     log(logPrefix, 'All chunks returned empty insights');
-    return null;
+    return { insights: null, totalLines: parseResult.totalLines, processedLines: parseResult.processedLines };
   }
 
-  return merged;
+  return { insights: merged, totalLines: parseResult.totalLines, processedLines: parseResult.processedLines };
 }
 
 /**

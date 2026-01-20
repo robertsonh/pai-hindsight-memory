@@ -227,8 +227,10 @@ function formatRestoredContext(
     parts.push('');
   }
 
-  parts.push('### Debugging Protocol');
-  parts.push('Before attempting fixes for errors, use `mcp__hindsight-project__reflect` to check for similar past mistakes and known solutions.');
+  parts.push('### Memory Protocols');
+  parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain` with the correction. Do NOT wait - corrections can be lost to compaction.');
+  parts.push('- **Self-Learning:** When you discover something through trial-and-error (commands that fail, correct syntax found via --help, non-obvious solutions), IMMEDIATELY store it with `mcp__hindsight-project__retain` using format: "LEARNED: [what failed] → [what works]"');
+  parts.push('- **Debugging:** Before attempting fixes, use `mcp__hindsight-project__reflect` to check for similar past mistakes.');
   parts.push('</restored-context>');
 
   return parts.join('\n');

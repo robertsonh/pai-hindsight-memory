@@ -13,7 +13,7 @@
  *   HINDSIGHT_PROJECT_URL - Hindsight API server URL
  *   HINDSIGHT_PROJECT - Project memory bank name
  *   LOCAL_LLM_URL - Local LLM server URL (default: http://uber.lan:11434)
- *   LOCAL_LLM_MODEL - Local LLM model name (default: qwen2.5:32b-instruct-q4_K_M)
+ *   LOCAL_LLM_MODEL - Local LLM model name (default: Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4)
  *   ANTHROPIC_API_KEY - Fallback for LLM analysis
  */
 

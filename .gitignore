@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.js
+*.d.ts
+*.js.map
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime state
+*.pid
+*.seed
+
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# Skills that should NOT be in this pack
+# (CORE is user-specific and should live in PAI_DIR/skills/)
+src/skills/CORE/
+
+# Test/dev artifacts
+coverage/
+.nyc_output/

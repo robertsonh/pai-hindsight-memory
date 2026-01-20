@@ -62,6 +62,35 @@ Use mcp__hindsight-hedley__reflect for personal analysis
 - Goals, career, life events
 - Information that transcends any single project
 
+---
+
+## Self-Learning Protocol (IMPORTANT)
+
+**When you learn something through trial-and-error, STORE IT IMMEDIATELY.**
+
+This applies when:
+- You try a command/approach that fails, then find what works
+- You need to use `--help` or docs to figure out correct syntax
+- You discover the right workflow after multiple attempts
+- You find a non-obvious solution to a problem
+
+**Action:** After succeeding, immediately call:
+```
+mcp__hindsight-project__retain
+Content: "LEARNED: [what I tried that failed] → [what actually works]. Usage: [correct syntax/workflow]"
+Context: "learning"
+```
+
+**Examples of what to store:**
+- CLI command syntax: "LEARNED: `openspec new` requires subcommand → Correct: `openspec new change <name>`"
+- API patterns: "LEARNED: This API returns paginated results → Must handle pagination"
+- Tool workflows: "LEARNED: Must run `bun install` before `bun run build`"
+- Configuration: "LEARNED: Port 8889 is Hindsight API, not 8888"
+
+**Why this matters:** Self-discovered knowledge is just as valuable as user corrections. Without storing it, you'll repeat the same trial-and-error in future sessions.
+
+---
+
 ## Examples
 
 **Example 1: Search project memories**
@@ -95,3 +124,4 @@ User: "Remember we decided to use PostgreSQL for this project"
 -> Stores to hindsight-project (project-specific decision)
 -> Confirms storage with context
 ```
+
