@@ -64,6 +64,51 @@ Use mcp__hindsight-hedley__reflect for personal analysis
 
 ---
 
+## Proactive Recall Protocol (CRITICAL)
+
+**BEFORE starting tasks, CHECK MEMORY FIRST.** Don't rediscover what you already know.
+
+### Always Recall Before
+
+| Task Type | Query Example |
+|-----------|---------------|
+| **Deployments** | "deployment steps, commands, and endpoints for [service]" |
+| **API calls** | "API paths, endpoints, and authentication for [service]" |
+| **Configuration** | "configuration, ports, environment variables for [service]" |
+| **Infrastructure** | "infrastructure setup, Docker, cloud resources for [project]" |
+| **Build/Test** | "build commands, test commands, CI/CD for [project]" |
+
+### How to Recall
+
+```
+mcp__hindsight-project__recall
+Query: "[task type] for [service/component name]"
+```
+
+### Examples
+
+**Before deploying:**
+```
+mcp__hindsight-project__recall
+Query: "deployment commands and endpoints for fast-classifier service"
+```
+
+**Before calling an API:**
+```
+mcp__hindsight-project__recall
+Query: "API paths and authentication for rag-agent-service"
+```
+
+**Before configuring:**
+```
+mcp__hindsight-project__recall
+Query: "Docker configuration and ports for Hindsight"
+```
+
+**Rationale:** Every `--help` command, every trial-and-error cycle, every "let me find that endpoint again" wastes time. The knowledge exists in memory - use it.
+
+---
+
 ## Self-Learning Protocol (IMPORTANT)
 
 **When you learn something through trial-and-error, STORE IT IMMEDIATELY.**
@@ -77,15 +122,26 @@ This applies when:
 **Action:** After succeeding, immediately call:
 ```
 mcp__hindsight-project__retain
-Content: "LEARNED: [what I tried that failed] → [what actually works]. Usage: [correct syntax/workflow]"
+Content: "LEARNED (YYYY-MM-DD HH:MM): [what I tried that failed] → [what actually works]. Usage: [correct syntax/workflow]"
 Context: "learning"
 ```
 
+### Timestamp Format (IMPORTANT)
+
+**Always include date and time in stored memories.** This populates Hindsight's timeline view.
+
+- Use format: `CATEGORY (YYYY-MM-DD HH:MM): content...`
+- Use current date/time unless the event clearly happened at a different time
+- Examples:
+  - `LEARNED (2026-01-21 17:30): Port 8889 is Hindsight API`
+  - `DEPLOYMENT (2026-01-21 14:15): Deployed to production`
+  - `DECISION (2026-01-15 10:00): Chose PostgreSQL over MongoDB` (past date if known)
+
 **Examples of what to store:**
-- CLI command syntax: "LEARNED: `openspec new` requires subcommand → Correct: `openspec new change <name>`"
-- API patterns: "LEARNED: This API returns paginated results → Must handle pagination"
-- Tool workflows: "LEARNED: Must run `bun install` before `bun run build`"
-- Configuration: "LEARNED: Port 8889 is Hindsight API, not 8888"
+- CLI command syntax: "LEARNED (2026-01-21 17:30): `openspec new` requires subcommand → Correct: `openspec new change <name>`"
+- API patterns: "LEARNED (2026-01-21 17:30): This API returns paginated results → Must handle pagination"
+- Tool workflows: "LEARNED (2026-01-21 17:30): Must run `bun install` before `bun run build`"
+- Configuration: "LEARNED (2026-01-21 17:30): Port 8889 is Hindsight API, not 8888"
 
 **Why this matters:** Self-discovered knowledge is just as valuable as user corrections. Without storing it, you'll repeat the same trial-and-error in future sessions.
 

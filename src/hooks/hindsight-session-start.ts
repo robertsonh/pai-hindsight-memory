@@ -282,6 +282,14 @@ function formatProjectContext(
   parts.push('<project-context>');
   parts.push(`Project: ${projectName}`);
   parts.push(`Memory Bank: ${PROJECT_BANK}`);
+
+  // Warn if using default bank - user probably forgot to set HINDSIGHT_PROJECT
+  if (PROJECT_BANK === 'project') {
+    parts.push('');
+    parts.push('⚠️ **WARNING: Using default "project" bank!** This is probably not what you intended.');
+    parts.push('Set the HINDSIGHT_PROJECT environment variable to your project-specific bank name.');
+    parts.push('Memories stored here may be mixed with other projects.');
+  }
   parts.push('');
 
   // Add hindsight context if available - with count and snippets
@@ -314,8 +322,10 @@ function formatProjectContext(
   parts.push(`- Use \`mcp__hindsight-${PERSONAL_BANK}__*\` for personal (non-project) memories`);
   parts.push('');
   parts.push('## Memory Protocols (IMPORTANT)');
+  parts.push('- **Proactive Recall (CRITICAL):** BEFORE deployments, API calls, or configuration tasks, ALWAYS `recall` first: "deployment/API/config for [service name]"');
+  parts.push('- **Timestamps (CRITICAL):** ALWAYS include date/time in stored memories: "CATEGORY (YYYY-MM-DD HH:MM): content..." - this populates the timeline view');
   parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain`. Do NOT wait.');
-  parts.push('- **Self-Learning:** When you discover something through trial-and-error (commands that fail, correct syntax via --help, non-obvious solutions), IMMEDIATELY store it: "LEARNED: [what failed] → [what works]"');
+  parts.push('- **Self-Learning:** When you discover something through trial-and-error, IMMEDIATELY store it: "LEARNED (YYYY-MM-DD HH:MM): [what failed] → [what works]"');
   parts.push('- **Debugging:** Before attempting fixes, use `mcp__hindsight-project__reflect` to check for similar past mistakes.');
   parts.push('</project-context>');
 
@@ -376,19 +386,41 @@ async function main() {
       console.log(output);
     }
 
-    // Send status to notification server (stderr doesn't display on SessionStart success)
+    // Build status messages (separate for text display vs voice)
     const personalCount = personalObservations.length;
     const projectMemoryCount = hindsightResponse?.count || 0;
     const voicePort = process.env.VOICE_PORT || '8888';
-    const statusMessage = `🧠 Hindsight: ${personalCount} personal profile facts, ${projectMemoryCount} project memories | Bank: ${PROJECT_BANK}`;
+    const isDefaultBank = PROJECT_BANK === 'project';
 
-    // Must await fetch before exit, otherwise process exits before request completes
+    // Text message for terminal display (concise, technical)
+    let textMessage = `🧠 Hindsight: ${personalCount} personal, ${projectMemoryCount} project memories | Bank: ${PROJECT_BANK}`;
+    if (isDefaultBank) {
+      textMessage += ` ⚠️ DEFAULT BANK - Set HINDSIGHT_PROJECT env var!`;
+    }
+
+    // Voice message (natural spoken language)
+    let voiceMessage: string;
+    if (isDefaultBank) {
+      voiceMessage = `Warning: using the default project bank. You probably forgot to set a project-specific bank. Loaded ${personalCount} personal and ${projectMemoryCount} project memories.`;
+    } else {
+      voiceMessage = `Loaded ${personalCount} personal and ${projectMemoryCount} project memories from the ${PROJECT_BANK} bank.`;
+    }
+
+    // Write directly to terminal (bypasses Claude's stdout/stderr capture)
+    try {
+      const fs = await import('fs');
+      fs.writeFileSync('/dev/tty', `\n${textMessage}\n\n`);
+    } catch {
+      // /dev/tty may not be available in all environments
+    }
+
+    // Send to voice notification server
     await fetch(`http://localhost:${voicePort}/notify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: statusMessage }),
+      body: JSON.stringify({ message: voiceMessage }),
     }).catch(() => {
-      // Notification server may not be running - silent fail
+      // Notification server may not be running - that's OK, we logged to terminal
     });
 
   } catch (error) {

@@ -227,9 +227,22 @@ function formatRestoredContext(
     parts.push('');
   }
 
+  parts.push('### What Was Lost in Compaction');
+  parts.push('- Exact code snippets and file contents (re-read files as needed)');
+  parts.push('- Detailed technical discussions (use recall to recover key points)');
+  parts.push('- Step-by-step progress on multi-part tasks');
+  parts.push('');
+  parts.push('### Immediate Actions After Compaction');
+  parts.push('1. **Check Todo List:** If there was a todo list, review it to see pending tasks');
+  parts.push('2. **Recall Current Work:** Use `mcp__hindsight-project__recall` with query "current work, recent tasks, what was I working on"');
+  parts.push('3. **Re-read Active Files:** Any files you were editing need to be re-read');
+  parts.push('4. **Confirm Before Continuing:** Ask user "I just recovered from compaction. Were we working on [X]?" before proceeding');
+  parts.push('');
   parts.push('### Memory Protocols');
-  parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain` with the correction. Do NOT wait - corrections can be lost to compaction.');
-  parts.push('- **Self-Learning:** When you discover something through trial-and-error (commands that fail, correct syntax found via --help, non-obvious solutions), IMMEDIATELY store it with `mcp__hindsight-project__retain` using format: "LEARNED: [what failed] → [what works]"');
+  parts.push('- **Proactive Recall (CRITICAL):** BEFORE deployments, API calls, or configuration tasks, ALWAYS `recall` first');
+  parts.push('- **Timestamps (CRITICAL):** ALWAYS include date/time in stored memories: "CATEGORY (YYYY-MM-DD HH:MM): content..."');
+  parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain`. Do NOT wait.');
+  parts.push('- **Self-Learning:** Store discoveries immediately: "LEARNED (YYYY-MM-DD HH:MM): [what failed] → [what works]"');
   parts.push('- **Debugging:** Before attempting fixes, use `mcp__hindsight-project__reflect` to check for similar past mistakes.');
   parts.push('</restored-context>');
 
