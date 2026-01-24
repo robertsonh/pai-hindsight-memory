@@ -28,45 +28,37 @@ PAI uses two Hindsight memory banks:
 | **Reflect** | "think about", "analyze patterns", "what patterns", "synthesize" | `Workflows/Reflect.md` |
 | **ManageBanks** | "list banks", "create bank", "project memory" | `Workflows/ManageBanks.md` |
 
-## Quick Reference
-
-### Recall (Search)
-```
-Use mcp__hindsight-project__recall for project-specific memories
-Use mcp__hindsight-hedley__recall for personal memories
-```
-
-### Retain (Store)
-```
-Use mcp__hindsight-project__retain for project facts
-Use mcp__hindsight-hedley__retain for personal facts
-```
-
-### Reflect (Analyze)
-```
-Use mcp__hindsight-project__reflect for project analysis
-Use mcp__hindsight-hedley__reflect for personal analysis
-```
-
-## Bank Selection Logic
-
-**Use hindsight-project when:**
-- Information relates to current codebase or project
-- Architectural decisions for this project
-- Bug fixes, features, refactors in this project
-- Project-specific preferences or patterns
-
-**Use hindsight-hedley when:**
-- Personal preferences (coding style, tools)
-- Contact information
-- Goals, career, life events
-- Information that transcends any single project
-
----
-
 ## Proactive Recall Protocol (CRITICAL)
 
 **BEFORE starting tasks, CHECK MEMORY FIRST.** Don't rediscover what you already know.
+
+### 🚨 Trigger Words - MUST Recall Before Proceeding
+
+When you see ANY of these words in a task, **STOP and recall first**:
+
+| Category | Trigger Words |
+|----------|---------------|
+| **Infrastructure** | deploy, docker, compose, container, kubernetes, k8s, helm, terraform |
+| **Configuration** | config, configuration, environment, env, settings, .env, yaml, yml |
+| **Build/CI** | build, ci, cd, pipeline, workflow, github actions, jenkins |
+| **Database** | database, db, migration, schema, postgres, mysql, mongodb |
+| **API/Server** | endpoint, route, api, server, service, port, host |
+| **Files to Create** | dockerfile, docker-compose, makefile, package.json, tsconfig |
+
+### ⛔ NEVER DO THIS
+
+**These actions WITHOUT recalling first are FORBIDDEN:**
+
+- **NEVER** create new `docker-compose.yaml`, `compose.yaml`, or `Dockerfile` without first recalling existing infrastructure
+- **NEVER** create new configuration files (`.env`, `config.yaml`, etc.) without checking if one already exists
+- **NEVER** assume you know the deployment process - recall it first
+- **NEVER** create new infrastructure from scratch when modifying existing systems
+- **NEVER** guess at ports, endpoints, or environment variables - they are stored in memory
+- **NEVER** run `--help` on a tool you've used before without checking memory first
+- **NEVER** start a deployment without recalling the deployment checklist
+- **NEVER** modify CI/CD workflows without recalling the existing pipeline structure
+
+**If you catch yourself about to do any of the above, STOP and recall.**
 
 ### Always Recall Before
 
@@ -77,6 +69,7 @@ Use mcp__hindsight-hedley__reflect for personal analysis
 | **Configuration** | "configuration, ports, environment variables for [service]" |
 | **Infrastructure** | "infrastructure setup, Docker, cloud resources for [project]" |
 | **Build/Test** | "build commands, test commands, CI/CD for [project]" |
+| **File Creation** | "existing files, structure, and templates for [type]" |
 
 ### How to Recall
 
@@ -105,7 +98,51 @@ mcp__hindsight-project__recall
 Query: "Docker configuration and ports for Hindsight"
 ```
 
+**Before creating any infrastructure file:**
+```
+mcp__hindsight-project__recall
+Query: "existing docker, compose, or infrastructure files in this project"
+```
+
 **Rationale:** Every `--help` command, every trial-and-error cycle, every "let me find that endpoint again" wastes time. The knowledge exists in memory - use it.
+
+---
+
+## Quick Reference
+
+### Recall (Search)
+```
+Use mcp__hindsight-project__recall for project-specific memories
+Use mcp__hindsight-hedley__recall for personal memories
+```
+
+### Retain (Store)
+```
+Use mcp__hindsight-project__retain for project facts
+Use mcp__hindsight-hedley__retain for personal facts
+```
+
+### Reflect (Analyze)
+```
+Use mcp__hindsight-project__reflect for project analysis
+Use mcp__hindsight-hedley__reflect for personal analysis
+```
+
+---
+
+## Bank Selection Logic
+
+**Use hindsight-project when:**
+- Information relates to current codebase or project
+- Architectural decisions for this project
+- Bug fixes, features, refactors in this project
+- Project-specific preferences or patterns
+
+**Use hindsight-hedley when:**
+- Personal preferences (coding style, tools)
+- Contact information
+- Goals, career, life events
+- Information that transcends any single project
 
 ---
 

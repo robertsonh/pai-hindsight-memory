@@ -322,11 +322,13 @@ function formatProjectContext(
   parts.push(`- Use \`mcp__hindsight-${PERSONAL_BANK}__*\` for personal (non-project) memories`);
   parts.push('');
   parts.push('## Memory Protocols (IMPORTANT)');
+  parts.push('- **🚨 RECALL TRIGGERS:** When task involves: deploy/docker/compose/container/config/env/settings/build/ci/database/api/endpoint → MUST recall first');
   parts.push('- **Proactive Recall (CRITICAL):** BEFORE deployments, API calls, or configuration tasks, ALWAYS `recall` first: "deployment/API/config for [service name]"');
   parts.push('- **Timestamps (CRITICAL):** ALWAYS include date/time in stored memories: "CATEGORY (YYYY-MM-DD HH:MM): content..." - this populates the timeline view');
   parts.push('- **User Corrections:** When the user corrects you, IMMEDIATELY call `mcp__hindsight-project__retain`. Do NOT wait.');
   parts.push('- **Self-Learning:** When you discover something through trial-and-error, IMMEDIATELY store it: "LEARNED (YYYY-MM-DD HH:MM): [what failed] → [what works]"');
   parts.push('- **Debugging:** Before attempting fixes, use `mcp__hindsight-project__reflect` to check for similar past mistakes.');
+  parts.push('- **⛔ NEVER:** Create docker-compose/Dockerfile/config files without recalling existing infrastructure. NEVER assume deployment process - recall it.');
   parts.push('</project-context>');
 
   return parts.join('\n');
