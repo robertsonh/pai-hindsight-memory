@@ -628,51 +628,77 @@ export async function extractInsights(
 
 /**
  * Store extracted insights to Hindsight memory bank.
+ * Uses batch retain with per-insight tags for granular retrieval.
+ * Each insight becomes its own item with appropriate tags (decision, mistake, correction, context).
  */
 export async function storeInsights(
   logPrefix: string,
   insights: ExtractedInsights,
   projectName: string,
   sessionId: string,
-  context: string = 'session-insights'
+  context: string = 'session-insights',
+  sessionTimestamp?: string
 ): Promise<boolean> {
-  const memories: string[] = [];
+  const items: Array<{
+    content: string;
+    context: string;
+    tags: string[];
+    timestamp: string;
+    metadata: Record<string, string>;
+  }> = [];
 
-  if (insights.decisions.length > 0) {
-    for (const decision of insights.decisions) {
-      memories.push(`DECISION: ${decision}`);
-    }
-  }
-
-  if (insights.mistakes.length > 0) {
-    for (const mistake of insights.mistakes) {
-      memories.push(`MISTAKE TO AVOID: ${mistake}`);
-    }
-  }
-
-  if (insights.corrections.length > 0) {
-    for (const correction of insights.corrections) {
-      memories.push(`CORRECTION: ${correction}`);
-    }
-  }
-
-  if (insights.key_context.length > 0) {
-    for (const ctx of insights.key_context) {
-      memories.push(`KEY CONTEXT: ${ctx}`);
-    }
-  }
-
-  if (memories.length === 0) {
-    log(logPrefix, 'No insights to store');
-    return false;
-  }
-
-  const narrative = `Session analysis for project ${projectName} on ${new Date().toLocaleDateString('en-US', {
+  const timestamp = sessionTimestamp || new Date().toISOString();
+  const dateStr = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  })}:\n\n${memories.join('\n\n')}`;
+  });
+
+  for (const decision of insights.decisions) {
+    items.push({
+      content: `DECISION for project ${projectName} (${dateStr}): ${decision}`,
+      context,
+      tags: ['decision', 'session-insight'],
+      timestamp,
+      metadata: { project: projectName, type: 'decision' },
+    });
+  }
+
+  for (const mistake of insights.mistakes) {
+    items.push({
+      content: `MISTAKE TO AVOID in project ${projectName} (${dateStr}): ${mistake}`,
+      context,
+      tags: ['mistake', 'session-insight'],
+      timestamp,
+      metadata: { project: projectName, type: 'mistake' },
+    });
+  }
+
+  for (const correction of insights.corrections) {
+    items.push({
+      content: `CORRECTION for project ${projectName} (${dateStr}): ${correction}`,
+      context,
+      tags: ['correction', 'session-insight'],
+      timestamp,
+      metadata: { project: projectName, type: 'correction' },
+    });
+  }
+
+  for (const ctx of insights.key_context) {
+    items.push({
+      content: `KEY CONTEXT for project ${projectName} (${dateStr}): ${ctx}`,
+      context,
+      tags: ['context', 'session-insight'],
+      timestamp,
+      metadata: { project: projectName, type: 'context' },
+    });
+  }
+
+  if (items.length === 0) {
+    log(logPrefix, 'No insights to store');
+    return false;
+  }
 
   try {
     const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/memories`, {
@@ -681,28 +707,15 @@ export async function storeInsights(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        items: [
-          {
-            content: narrative,
-            context,
-            document_id: `insights_${sessionId}_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              project: projectName,
-              type: context,
-              decisions_count: String(insights.decisions.length),
-              mistakes_count: String(insights.mistakes.length),
-              corrections_count: String(insights.corrections.length),
-              context_count: String(insights.key_context.length),
-            },
-          },
-        ],
+        items,
+        document_id: `insights_${sessionId}`,
+        document_tags: ['session-insight', `session-${sessionId}`],
         async: true,
       }),
     });
 
     if (response.ok) {
-      log(logPrefix, `Successfully stored ${memories.length} insights to bank "${PROJECT_BANK}"`);
+      log(logPrefix, `Successfully stored ${items.length} individual insights to bank "${PROJECT_BANK}" (${insights.decisions.length} decisions, ${insights.mistakes.length} mistakes, ${insights.corrections.length} corrections, ${insights.key_context.length} context)`);
       return true;
     } else {
       const errorText = await response.text();

@@ -46,7 +46,21 @@ Write a clear, specific memory that includes:
 Date: 2026-01-14"
 ```
 
-### Step 3: Store the Memory
+### Step 3: Select Tags
+
+**Always tag your memories.** Tags enable precise filtering on recall.
+
+| Category | Tags to Apply |
+|----------|---------------|
+| **Decisions** | `decision` + domain tag (`architecture`, `database`, `api`, `security`, `deployment`) |
+| **Learnings** | `learned` + domain tag (`debugging`, `performance`, `testing`) |
+| **Mistakes** | `mistake` + domain tag |
+| **Corrections** | `correction` + domain tag |
+| **Infrastructure** | `deployment`, `config`, `docker`, `ci-cd` |
+| **Preferences** | `preference` + domain (`editor`, `tools`, `style`) |
+| **People/Contacts** | `contact`, `person` |
+
+### Step 4: Store the Memory
 
 **For project memories:**
 ```
@@ -54,7 +68,7 @@ Use tool: mcp__hindsight-project__retain
 Parameters:
   content: [detailed memory content]
   context: [category: architecture, debugging, features, etc.]
-  async_processing: true
+  timestamp: "2026-02-14T15:00:00Z"  (ISO 8601 - always include!)
 ```
 
 **For personal memories:**
@@ -63,15 +77,38 @@ Use tool: mcp__hindsight-hedley__retain
 Parameters:
   content: [detailed memory content]
   context: [category: preferences, goals, contacts, etc.]
-  async_processing: true
+  timestamp: "2026-02-14T15:00:00Z"  (ISO 8601 - always include!)
 ```
 
-### Step 4: Confirm Storage
+### Step 5: Confirm Storage
 
 After storing, confirm to the user:
 - What was stored
 - Which bank it was stored in
-- The context category used
+- The context category and tags used
+
+## Tag Taxonomy Reference
+
+### Project Bank Tags
+
+| Domain | Tags |
+|--------|------|
+| Architecture | `decision`, `architecture`, `database`, `api`, `security` |
+| Development | `feature`, `bugfix`, `refactor`, `patterns` |
+| Infrastructure | `deployment`, `config`, `docker`, `ci-cd`, `monitoring` |
+| Quality | `testing`, `performance`, `debugging` |
+| Session | `session`, `session-insight`, `pre-compact` |
+| Learning | `learned`, `mistake`, `correction`, `context` |
+
+### Personal Bank Tags
+
+| Domain | Tags |
+|--------|------|
+| Identity | `preference`, `identity`, `background` |
+| Technical | `stack`, `tools`, `editor`, `style` |
+| People | `contact`, `person`, `relationship` |
+| Life | `goal`, `health`, `hobby`, `travel` |
+| Work | `work`, `career`, `project` |
 
 ## Context Categories
 
@@ -95,14 +132,22 @@ After storing, confirm to the user:
 - `health` - Health-related reminders
 - `general` - Miscellaneous
 
+## Timestamp Format (CRITICAL)
+
+**Always pass `timestamp` in ISO 8601 format.** This enables Hindsight's temporal queries (date ranges, "last week", "before March").
+
+- Use the current time unless the event clearly happened at a different time
+- Hindsight tracks dual timestamps: event time (your `timestamp`) and retention time (automatic)
+
 ## Examples
 
-**Store project decision:**
+**Store project decision with tags:**
 ```
 User: "Remember that we're using Redis for session storage"
 -> mcp__hindsight-project__retain
-   content: "Using Redis for session storage in this project. Chosen for fast read/write performance and built-in TTL support for session expiration."
+   content: "Decided to use Redis for session storage in this project. Chosen for fast read/write performance and built-in TTL support for session expiration."
    context: "architecture"
+   timestamp: "2026-02-14T15:00:00Z"
 ```
 
 **Store personal preference:**
@@ -111,4 +156,14 @@ User: "I prefer dark mode in all my tools"
 -> mcp__hindsight-hedley__retain
    content: "Hedley prefers dark mode/themes in all development tools, editors, and IDEs."
    context: "preferences"
+   timestamp: "2026-02-14T15:00:00Z"
+```
+
+**Store a learning:**
+```
+After discovering something through trial-and-error:
+-> mcp__hindsight-project__retain
+   content: "LEARNED: Port 8889 is the Hindsight API server, not 8888. Port 8888 is the voice notification server."
+   context: "learning"
+   timestamp: "2026-02-14T15:30:00Z"
 ```

@@ -44,6 +44,20 @@
           }
         ]
       }
+    ],
+
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run $PAI_DIR/hooks/hindsight-post-compact.ts",
+            "_source": "pai-hindsight-memory",
+            "_description": "Restore key context after compaction (triggered on Stop event)"
+          }
+        ]
+      }
     ]
   }
 }

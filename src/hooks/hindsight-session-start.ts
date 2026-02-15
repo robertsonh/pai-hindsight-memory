@@ -32,13 +32,6 @@ interface SessionStartData {
   [key: string]: unknown;
 }
 
-interface ProjectContext {
-  project_name: string;
-  recent_sessions: string[];
-  last_topic: string | null;
-  recent_files: string[];
-}
-
 interface HindsightResult {
   id: string;
   text: string;
@@ -51,25 +44,6 @@ interface RecallResponse {
   results: HindsightResult[];
 }
 
-interface EntityObservation {
-  text: string;
-  mentioned_at: string;
-}
-
-interface EntityWithObservations {
-  id: string;
-  canonical_name: string;
-  mention_count: number;
-  observations: EntityObservation[];
-}
-
-interface EntitiesResponse {
-  items: Array<{
-    id: string;
-    canonical_name: string;
-    mention_count: number;
-  }>;
-}
 
 // ============================================================================
 // Helper Functions
@@ -97,6 +71,7 @@ async function ensureBankExists(bankId: string, projectName: string): Promise<bo
       body: JSON.stringify({
         name: projectName,
         background: `Project memory bank for ${projectName}`,
+        mission: `I am the memory for the ${projectName} project. I track architecture decisions, debugging learnings, deployment procedures, code patterns, and session history. I help maintain continuity across coding sessions.`,
       }),
     });
 
@@ -105,6 +80,37 @@ async function ensureBankExists(bankId: string, projectName: string): Promise<bo
     // Server may not be running
     return false;
   }
+}
+
+async function fetchMentalModel(bankId: string): Promise<string | null> {
+  try {
+    const listResponse = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${bankId}/mental-models`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!listResponse.ok) return null;
+
+    const models = await listResponse.json();
+    const summaryModel = Array.isArray(models)
+      ? models.find((m: { name?: string }) => m.name === 'project-summary')
+      : null;
+
+    if (!summaryModel?.id) return null;
+
+    const modelResponse = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${bankId}/mental-models/${summaryModel.id}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (modelResponse.ok) {
+      const modelData = await modelResponse.json();
+      return modelData.reflect_response?.text || modelData.content || null;
+    }
+  } catch {
+    // Mental models may not be configured yet
+  }
+  return null;
 }
 
 async function recallFromHindsight(projectName: string): Promise<RecallResponse | null> {
@@ -117,6 +123,7 @@ async function recallFromHindsight(projectName: string): Promise<RecallResponse 
   try {
     // Try to recall recent context via HTTP API
     // API: POST /v1/default/banks/{bank_id}/memories/recall
+    // Use budget: "low" for speed at session start, types: ["observation"] for consolidated knowledge
     const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${bankId}/memories/recall`, {
       method: 'POST',
       headers: {
@@ -125,6 +132,8 @@ async function recallFromHindsight(projectName: string): Promise<RecallResponse 
       body: JSON.stringify({
         query: `Recent work on project ${projectName}`,
         max_tokens: 2048,
+        budget: 'low',
+        types: ['observation', 'experience'],
       }),
     });
 
@@ -151,70 +160,41 @@ async function recallFromHindsight(projectName: string): Promise<RecallResponse 
   return null;
 }
 
-async function fetchPersonalObservations(): Promise<EntityObservation[]> {
-  // Fetch observations from ALL entities in personal bank
-  // Since it's a personal bank, all entities are relevant to the user's profile
+async function recallPersonalMemories(): Promise<RecallResponse | null> {
+  // Recall personal context from the personal bank using the same approach as project memories
+  // Use budget: "low" for speed, tags for targeted results
   try {
-    // Get the list of all entities
-    const entitiesResponse = await fetch(
-      `${HINDSIGHT_URL}/v1/default/banks/${PERSONAL_BANK}/entities`
-    );
-
-    if (!entitiesResponse.ok) {
-      return [];
-    }
-
-    const entitiesData: EntitiesResponse = await entitiesResponse.json();
-
-    if (!entitiesData.items || entitiesData.items.length === 0) {
-      return [];
-    }
-
-    // Sort by mention count and take top entities (limit to avoid too many requests)
-    const topEntities = entitiesData.items
-      .sort((a, b) => b.mention_count - a.mention_count)
-      .slice(0, 10); // Top 10 entities by mention count
-
-    // Fetch observations from all top entities in parallel
-    const entityPromises = topEntities.map(async (entity) => {
-      try {
-        const entityResponse = await fetch(
-          `${HINDSIGHT_URL}/v1/default/banks/${PERSONAL_BANK}/entities/${entity.id}`
-        );
-        if (entityResponse.ok) {
-          const entityData: EntityWithObservations = await entityResponse.json();
-          return entityData.observations || [];
-        }
-      } catch {
-        // Skip failed entities
-      }
-      return [];
+    const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PERSONAL_BANK}/memories/recall`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `Personal preferences, settings, identity, background, and interests`,
+        max_tokens: 1024,
+        budget: 'low',
+      }),
     });
 
-    const allObservations = await Promise.all(entityPromises);
-
-    // Normalize text for deduplication (lowercase, strip punctuation)
-    const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').trim();
-
-    // Flatten and deduplicate observations by normalized text
-    const seen = new Set<string>();
-    const uniqueObservations: EntityObservation[] = [];
-
-    for (const observations of allObservations) {
-      for (const obs of observations) {
-        const normalized = normalize(obs.text);
-        if (!seen.has(normalized)) {
-          seen.add(normalized);
-          uniqueObservations.push(obs);
-        }
+    if (response.ok) {
+      const data = await response.json();
+      if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+        return {
+          count: data.results.length,
+          results: data.results.map((r: HindsightResult) => ({
+            id: r.id || 'unknown',
+            text: r.text || '',
+            context: r.context,
+            document_id: r.document_id,
+          })),
+        };
       }
     }
-
-    return uniqueObservations;
   } catch {
     // Hindsight server may not be running
-    return [];
   }
+
+  return null;
 }
 
 function loadPendingMemories(projectName: string): string[] {
@@ -263,17 +243,19 @@ function formatProjectContext(
   projectName: string,
   hindsightResponse: RecallResponse | null,
   pendingMemories: string[],
-  personalObservations: EntityObservation[]
+  personalResponse: RecallResponse | null,
+  mentalModel: string | null = null
 ): string {
   const parts: string[] = [];
 
-  // Personal profile section (from observations)
-  if (personalObservations.length > 0) {
+  // Personal profile section (from personal bank recall)
+  if (personalResponse && personalResponse.count > 0) {
     parts.push('<personal-profile>');
-    parts.push(`## About ${PERSONAL_BANK.charAt(0).toUpperCase() + PERSONAL_BANK.slice(1)}`);
+    parts.push(`## About ${PERSONAL_BANK.charAt(0).toUpperCase() + PERSONAL_BANK.slice(1)} (${personalResponse.count} personal memories)`);
     parts.push('');
-    for (const obs of personalObservations) {
-      parts.push(`• ${obs.text}`);
+    for (const result of personalResponse.results) {
+      const snippet = truncateText(result.text, 150);
+      parts.push(`• ${snippet}`);
     }
     parts.push('</personal-profile>');
     parts.push('');
@@ -291,6 +273,14 @@ function formatProjectContext(
     parts.push('Memories stored here may be mixed with other projects.');
   }
   parts.push('');
+
+  // Add mental model summary if available (pre-computed, high-quality overview)
+  if (mentalModel) {
+    parts.push('## Project Summary (Mental Model)');
+    parts.push('');
+    parts.push(mentalModel);
+    parts.push('');
+  }
 
   // Add hindsight context if available - with count and snippets
   if (hindsightResponse && hindsightResponse.count > 0) {
@@ -358,9 +348,10 @@ async function main() {
     // Get project name
     const projectName = extractProjectName(cwd);
 
-    // Fetch personal observations and project context in parallel
-    const [personalObservations, hindsightResponse] = await Promise.all([
-      fetchPersonalObservations(),
+    // Fetch mental model, personal memories, and project context in parallel
+    const [mentalModel, personalResponse, hindsightResponse] = await Promise.all([
+      fetchMentalModel(PROJECT_BANK),
+      recallPersonalMemories(),
       recallFromHindsight(projectName),
     ]);
 
@@ -373,23 +364,24 @@ async function main() {
       const fs = await import('fs');
       const memCount = hindsightResponse?.count || 0;
       const pendingCount = pendingMemories.length;
-      const obsCount = personalObservations.length;
-      fs.appendFileSync(debugPath, `[${new Date().toISOString()}] SessionStart: project=${projectName}, bank=${PROJECT_BANK}, memories=${memCount}, pending=${pendingCount}, observations=${obsCount}\n`);
+      const personalCount = personalResponse?.count || 0;
+      fs.appendFileSync(debugPath, `[${new Date().toISOString()}] SessionStart: project=${projectName}, bank=${PROJECT_BANK}, memories=${memCount}, pending=${pendingCount}, personal=${personalCount}\n`);
     } catch {}
 
     // Only output if we have context to share
     const hasContext =
-      personalObservations.length > 0 ||
+      mentalModel ||
+      (personalResponse && personalResponse.count > 0) ||
       (hindsightResponse && hindsightResponse.count > 0) ||
       pendingMemories.length > 0;
 
     if (hasContext) {
-      const output = formatProjectContext(projectName, hindsightResponse, pendingMemories, personalObservations);
+      const output = formatProjectContext(projectName, hindsightResponse, pendingMemories, personalResponse, mentalModel);
       console.log(output);
     }
 
     // Build status messages (separate for text display vs voice)
-    const personalCount = personalObservations.length;
+    const personalCount = personalResponse?.count || 0;
     const projectMemoryCount = hindsightResponse?.count || 0;
     const voicePort = process.env.VOICE_PORT || '8888';
     const isDefaultBank = PROJECT_BANK === 'project';

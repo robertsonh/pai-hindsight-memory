@@ -404,15 +404,17 @@ async function storeToHindsight(memory: ProjectMemory): Promise<void> {
           {
             content,
             context: 'session',
-            // Include timestamp in document_id so resumed sessions create new entries
-            document_id: `session_${memory.session_id}_${Date.now()}`,
             timestamp: memory.timestamp,
+            tags: ['session', `session-${new Date().toISOString().slice(0, 10)}`],
             metadata: {
               project: memory.project_name,
               branch: memory.git_branch || '',
             },
           },
         ],
+        // Consistent document_id so resumed sessions update the same document
+        document_id: `session_${memory.session_id}`,
+        document_tags: ['session'],
         async: true,
       }),
     });

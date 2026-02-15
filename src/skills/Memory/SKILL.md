@@ -1,6 +1,6 @@
 ---
 name: Memory
-description: AI memory management using Hindsight MCP. USE WHEN remember, recall, memory, memories, what do you know, what did we discuss, save this, retain this, store information, reflect on, analyze patterns, project context, past sessions.
+description: AI memory management using Hindsight MCP. USE WHEN remember, recall, memory, memories, what do you know, what did we discuss, save this, retain this, store information, reflect on, analyze patterns, project context, past sessions, mental model, mental models, configure bank, directives.
 ---
 
 # Memory
@@ -27,12 +27,36 @@ PAI uses two Hindsight memory banks:
 | **Retain** | "remember this", "save this", "store this fact" | `Workflows/Retain.md` |
 | **Reflect** | "think about", "analyze patterns", "what patterns", "synthesize" | `Workflows/Reflect.md` |
 | **ManageBanks** | "list banks", "create bank", "project memory" | `Workflows/ManageBanks.md` |
+| **ManageMentalModels** | "mental model", "create summary", "project overview", "refresh summary" | `Workflows/ManageMentalModels.md` |
+| **ConfigureBank** | "configure bank", "set disposition", "add directive", "bank mission" | `Workflows/ConfigureBank.md` |
+
+## Mental Models — Check Before Recall
+
+**Before running recall for overview questions, check if a Mental Model exists.**
+
+Mental Models are pre-computed, cached reflect responses that provide instant answers to common questions like:
+- "What is this project's architecture?"
+- "How do we deploy?"
+- "What conventions do we follow?"
+
+```
+mcp__hindsight-project__list_mental_models
+-> If "project-summary" exists, use get_mental_model instead of recall
+```
+
+Mental Models auto-refresh when new knowledge is consolidated. They're faster and more coherent than raw recall for overview queries.
 
 ## Proactive Recall Protocol (CRITICAL)
 
 **BEFORE starting tasks, CHECK MEMORY FIRST.** Don't rediscover what you already know.
 
-### 🚨 Trigger Words - MUST Recall Before Proceeding
+### Priority: Mental Model > Recall > Reflect
+
+1. **Mental Model** — Instant pre-computed answer (check first)
+2. **Recall** — Search raw facts and observations
+3. **Reflect** — Synthesized reasoning (slower but deeper)
+
+### Trigger Words - MUST Recall Before Proceeding
 
 When you see ANY of these words in a task, **STOP and recall first**:
 
@@ -45,7 +69,7 @@ When you see ANY of these words in a task, **STOP and recall first**:
 | **API/Server** | endpoint, route, api, server, service, port, host |
 | **Files to Create** | dockerfile, docker-compose, makefile, package.json, tsconfig |
 
-### ⛔ NEVER DO THIS
+### NEVER DO THIS
 
 **These actions WITHOUT recalling first are FORBIDDEN:**
 
@@ -62,49 +86,48 @@ When you see ANY of these words in a task, **STOP and recall first**:
 
 ### Always Recall Before
 
-| Task Type | Query Example |
-|-----------|---------------|
-| **Deployments** | "deployment steps, commands, and endpoints for [service]" |
-| **API calls** | "API paths, endpoints, and authentication for [service]" |
-| **Configuration** | "configuration, ports, environment variables for [service]" |
-| **Infrastructure** | "infrastructure setup, Docker, cloud resources for [project]" |
-| **Build/Test** | "build commands, test commands, CI/CD for [project]" |
-| **File Creation** | "existing files, structure, and templates for [type]" |
+| Task Type | Query Example | Recommended Tags |
+|-----------|---------------|-----------------|
+| **Deployments** | "deployment steps and endpoints for [service]" | `deployment`, `config` |
+| **API calls** | "API paths and authentication for [service]" | `api`, `config` |
+| **Configuration** | "configuration, ports, environment variables for [service]" | `config`, `deployment` |
+| **Infrastructure** | "infrastructure setup, Docker, cloud resources" | `docker`, `deployment` |
+| **Build/Test** | "build commands, test commands, CI/CD" | `ci-cd`, `testing` |
+| **Debugging** | "known issues and past mistakes with [component]" | `mistake`, `debugging` |
 
 ### How to Recall
 
 ```
 mcp__hindsight-project__recall
-Query: "[task type] for [service/component name]"
+  query: "[task type] for [service/component name]"
+  tags: ["relevant", "tags"]  (optional but recommended)
+  budget: "high"  (for critical operations like deployment)
 ```
 
-### Examples
+---
 
-**Before deploying:**
-```
-mcp__hindsight-project__recall
-Query: "deployment commands and endpoints for fast-classifier service"
-```
+## Tag Taxonomy Reference
 
-**Before calling an API:**
-```
-mcp__hindsight-project__recall
-Query: "API paths and authentication for rag-agent-service"
-```
+### Project Bank Tags
 
-**Before configuring:**
-```
-mcp__hindsight-project__recall
-Query: "Docker configuration and ports for Hindsight"
-```
+| Domain | Tags |
+|--------|------|
+| Architecture | `decision`, `architecture`, `database`, `api`, `security` |
+| Development | `feature`, `bugfix`, `refactor`, `patterns` |
+| Infrastructure | `deployment`, `config`, `docker`, `ci-cd`, `monitoring` |
+| Quality | `testing`, `performance`, `debugging` |
+| Session | `session`, `session-insight`, `pre-compact` |
+| Learning | `learned`, `mistake`, `correction`, `context` |
 
-**Before creating any infrastructure file:**
-```
-mcp__hindsight-project__recall
-Query: "existing docker, compose, or infrastructure files in this project"
-```
+### Personal Bank Tags
 
-**Rationale:** Every `--help` command, every trial-and-error cycle, every "let me find that endpoint again" wastes time. The knowledge exists in memory - use it.
+| Domain | Tags |
+|--------|------|
+| Identity | `preference`, `identity`, `background` |
+| Technical | `stack`, `tools`, `editor`, `style` |
+| People | `contact`, `person`, `relationship` |
+| Life | `goal`, `health`, `hobby`, `travel` |
+| Work | `work`, `career`, `project` |
 
 ---
 
@@ -114,18 +137,29 @@ Query: "existing docker, compose, or infrastructure files in this project"
 ```
 Use mcp__hindsight-project__recall for project-specific memories
 Use mcp__hindsight-hedley__recall for personal memories
+Parameters: query, max_tokens, budget, tags, types
 ```
 
 ### Retain (Store)
 ```
 Use mcp__hindsight-project__retain for project facts
 Use mcp__hindsight-hedley__retain for personal facts
+Parameters: content, context, timestamp (always include!)
 ```
 
 ### Reflect (Analyze)
 ```
 Use mcp__hindsight-project__reflect for project analysis
 Use mcp__hindsight-hedley__reflect for personal analysis
+Parameters: query, context, budget, tags, response_schema
+```
+
+### Mental Models (Pre-computed Answers)
+```
+Use mcp__hindsight-project__list_mental_models to find models
+Use mcp__hindsight-project__get_mental_model for instant answers
+Use mcp__hindsight-project__create_mental_model to create new ones
+Use mcp__hindsight-project__refresh_mental_model to update
 ```
 
 ---
@@ -159,62 +193,58 @@ This applies when:
 **Action:** After succeeding, immediately call:
 ```
 mcp__hindsight-project__retain
-Content: "LEARNED (YYYY-MM-DD HH:MM): [what I tried that failed] → [what actually works]. Usage: [correct syntax/workflow]"
-Context: "learning"
+  content: "LEARNED (YYYY-MM-DD HH:MM): [what I tried that failed] -> [what actually works]. Usage: [correct syntax/workflow]"
+  context: "learning"
+  timestamp: "2026-02-14T15:00:00Z"
 ```
 
 ### Timestamp Format (IMPORTANT)
 
-**Always include date and time in stored memories.** This populates Hindsight's timeline view.
+**Always include date and time in stored memories.** This populates Hindsight's timeline view and enables temporal queries.
 
-- Use format: `CATEGORY (YYYY-MM-DD HH:MM): content...`
+- Use ISO 8601 format for the `timestamp` parameter
+- Include date/time in the content too for human readability
 - Use current date/time unless the event clearly happened at a different time
-- Examples:
-  - `LEARNED (2026-01-21 17:30): Port 8889 is Hindsight API`
-  - `DEPLOYMENT (2026-01-21 14:15): Deployed to production`
-  - `DECISION (2026-01-15 10:00): Chose PostgreSQL over MongoDB` (past date if known)
-
-**Examples of what to store:**
-- CLI command syntax: "LEARNED (2026-01-21 17:30): `openspec new` requires subcommand → Correct: `openspec new change <name>`"
-- API patterns: "LEARNED (2026-01-21 17:30): This API returns paginated results → Must handle pagination"
-- Tool workflows: "LEARNED (2026-01-21 17:30): Must run `bun install` before `bun run build`"
-- Configuration: "LEARNED (2026-01-21 17:30): Port 8889 is Hindsight API, not 8888"
-
-**Why this matters:** Self-discovered knowledge is just as valuable as user corrections. Without storing it, you'll repeat the same trial-and-error in future sessions.
 
 ---
 
 ## Examples
 
-**Example 1: Search project memories**
+**Example 1: Search project memories with tags**
 ```
-User: "What did we discuss about authentication in this project?"
+User: "What did we decide about authentication in this project?"
 -> Invokes Recall workflow
--> Searches hindsight-project with query "authentication"
--> Returns relevant project memories
+-> mcp__hindsight-project__recall
+   query: "authentication decisions"
+   tags: ["decision", "security"]
+   budget: "mid"
 ```
 
 **Example 2: Store a personal preference**
 ```
 User: "Remember that I prefer TypeScript over JavaScript"
 -> Invokes Retain workflow
--> Stores to hindsight-hedley (personal preference, not project-specific)
--> Confirms storage
+-> mcp__hindsight-hedley__retain
+   content: "Hedley prefers TypeScript over JavaScript for all projects"
+   context: "preferences"
+   timestamp: "2026-02-14T15:00:00Z"
 ```
 
 **Example 3: Analyze project patterns**
 ```
 User: "What architectural patterns have emerged in this project?"
 -> Invokes Reflect workflow
--> Uses hindsight-project reflect with analysis query
--> Returns synthesized analysis
+-> mcp__hindsight-project__reflect
+   query: "What architectural patterns and design decisions have been consistently applied?"
+   context: "Planning a new module and want to maintain consistency"
+   budget: "mid"
 ```
 
-**Example 4: Save project decision**
+**Example 4: Get instant project overview**
 ```
-User: "Remember we decided to use PostgreSQL for this project"
--> Invokes Retain workflow
--> Stores to hindsight-project (project-specific decision)
--> Confirms storage with context
+User: "Give me a project overview"
+-> Invokes ManageMentalModels workflow
+-> mcp__hindsight-project__list_mental_models
+-> mcp__hindsight-project__get_mental_model (if "project-summary" exists)
+-> Falls back to reflect if no mental model
 ```
-

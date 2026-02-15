@@ -131,10 +131,20 @@ PACK_DIR="$(pwd)"
 # Copy hooks
 cp "$PACK_DIR/src/hooks/hindsight-session-save.ts" "$PAI_DIR/hooks/"
 cp "$PACK_DIR/src/hooks/hindsight-session-start.ts" "$PAI_DIR/hooks/"
+cp "$PACK_DIR/src/hooks/hindsight-pre-compact.ts" "$PAI_DIR/hooks/"
+cp "$PACK_DIR/src/hooks/hindsight-post-compact.ts" "$PAI_DIR/hooks/"
+cp "$PACK_DIR/src/hooks/hindsight-extract-insights-bg.ts" "$PAI_DIR/hooks/"
+
+# Copy hook library (required by hooks)
+mkdir -p "$PAI_DIR/hooks/lib"
+cp "$PACK_DIR/src/hooks/lib/insight-extractor.ts" "$PAI_DIR/hooks/lib/"
 
 # Make executable
 chmod +x "$PAI_DIR/hooks/hindsight-session-save.ts"
 chmod +x "$PAI_DIR/hooks/hindsight-session-start.ts"
+chmod +x "$PAI_DIR/hooks/hindsight-pre-compact.ts"
+chmod +x "$PAI_DIR/hooks/hindsight-post-compact.ts"
+chmod +x "$PAI_DIR/hooks/hindsight-extract-insights-bg.ts"
 
 # Verify
 ls -la "$PAI_DIR/hooks/"*hindsight*
@@ -172,6 +182,30 @@ Add the following hooks to your `~/.claude/settings.json`.
           {
             "type": "command",
             "command": "bun run /home/YOUR_USER/.config/pai/hooks/hindsight-session-save.ts"
+          }
+        ]
+      }
+    ],
+
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run /home/YOUR_USER/.config/pai/hooks/hindsight-pre-compact.ts"
+          }
+        ]
+      }
+    ],
+
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run /home/YOUR_USER/.config/pai/hooks/hindsight-post-compact.ts"
           }
         ]
       }

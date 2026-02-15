@@ -74,118 +74,136 @@ function extractProjectName(cwd: string): string {
   return basename(cwd);
 }
 
-async function recallInsights(projectName: string): Promise<RecallResponse | null> {
+async function recallByTag(projectName: string, tags: string[], maxTokens: number = 2048): Promise<HindsightResult[]> {
   try {
-    // Query for decisions, mistakes, and corrections specifically
     const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/memories/recall`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: `Recent decisions, mistakes to avoid, corrections, and key context for project ${projectName}`,
-        max_tokens: 4096,
+        query: `Recent ${tags.join(', ')} for project ${projectName}`,
+        max_tokens: maxTokens,
+        budget: 'high',
+        tags,
+        tags_match: 'any',
       }),
     });
 
     if (response.ok) {
       const data = await response.json();
       if (data.results && Array.isArray(data.results) && data.results.length > 0) {
-        return {
-          count: data.results.length,
-          results: data.results.map((r: HindsightResult) => ({
-            id: r.id || 'unknown',
-            text: r.text || '',
-            context: r.context,
-            document_id: r.document_id,
-            metadata: r.metadata,
-          })),
-        };
+        return data.results.map((r: HindsightResult) => ({
+          id: r.id || 'unknown',
+          text: r.text || '',
+          context: r.context,
+          document_id: r.document_id,
+          metadata: r.metadata,
+        }));
       }
     }
   } catch {
     // Hindsight server may not be running
   }
+  return [];
+}
 
+async function reflectForContext(projectName: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/reflect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `What is the current state of work on project ${projectName}? What was I working on most recently, and what important context should I remember?`,
+        budget: 'mid',
+        max_tokens: 2048,
+        context: 'Restoring context after compaction — need to understand what was happening before context was lost',
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.text || null;
+    }
+  } catch {
+    // Hindsight server may not be running
+  }
   return null;
 }
 
-function categorizeInsights(results: HindsightResult[]): {
-  decisions: string[];
-  mistakes: string[];
-  corrections: string[];
-  keyContext: string[];
-} {
-  const decisions: string[] = [];
-  const mistakes: string[] = [];
-  const corrections: string[] = [];
-  const keyContext: string[] = [];
+async function fetchMentalModel(projectName: string): Promise<string | null> {
+  try {
+    // List mental models and look for project-summary
+    const listResponse = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/mental-models`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!listResponse.ok) return null;
+
+    const models = await listResponse.json();
+    const summaryModel = Array.isArray(models)
+      ? models.find((m: { name?: string }) => m.name === 'project-summary')
+      : null;
+
+    if (!summaryModel?.id) return null;
+
+    // Fetch the full mental model content
+    const modelResponse = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/mental-models/${summaryModel.id}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (modelResponse.ok) {
+      const modelData = await modelResponse.json();
+      return modelData.reflect_response?.text || modelData.content || null;
+    }
+  } catch {
+    // Mental models may not be configured yet
+  }
+  return null;
+}
+
+function extractTexts(results: HindsightResult[], limit: number = 5): string[] {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  const seen = new Set<string>();
+  const texts: string[] = [];
 
   for (const result of results) {
-    const text = result.text;
-
-    // Parse the insight text to categorize
-    if (text.includes('DECISION:')) {
-      const match = text.match(/DECISION:\s*(.+?)(?=\n\n|MISTAKE|CORRECTION|KEY CONTEXT|$)/s);
-      if (match) decisions.push(match[1].trim());
-    }
-    if (text.includes('MISTAKE TO AVOID:')) {
-      const match = text.match(/MISTAKE TO AVOID:\s*(.+?)(?=\n\n|DECISION|CORRECTION|KEY CONTEXT|$)/s);
-      if (match) mistakes.push(match[1].trim());
-    }
-    if (text.includes('CORRECTION:')) {
-      const match = text.match(/CORRECTION:\s*(.+?)(?=\n\n|DECISION|MISTAKE|KEY CONTEXT|$)/s);
-      if (match) corrections.push(match[1].trim());
-    }
-    if (text.includes('KEY CONTEXT:')) {
-      const match = text.match(/KEY CONTEXT:\s*(.+?)(?=\n\n|DECISION|MISTAKE|CORRECTION|$)/s);
-      if (match) keyContext.push(match[1].trim());
-    }
-
-    // Also check metadata for type hints
-    if (result.metadata?.type === 'pre-compact-analysis' || result.metadata?.type === 'session-insights') {
-      // These are structured insight documents, already handled above
-    }
+    const text = result.text.trim();
+    if (!text) continue;
+    const key = normalize(text);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    texts.push(text);
+    if (texts.length >= limit) break;
   }
 
-  // Deduplicate
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').trim();
-  const dedup = (arr: string[]) => {
-    const seen = new Set<string>();
-    return arr.filter(item => {
-      const key = normalize(item);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
-
-  return {
-    decisions: dedup(decisions).slice(0, 5),  // Limit to most recent 5
-    mistakes: dedup(mistakes).slice(0, 5),
-    corrections: dedup(corrections).slice(0, 5),
-    keyContext: dedup(keyContext).slice(0, 5),
-  };
+  return texts;
 }
 
 function formatRestoredContext(
   projectName: string,
-  insights: {
+  data: {
+    mentalModel: string | null;
     decisions: string[];
     mistakes: string[];
     corrections: string[];
-    keyContext: string[];
+    reflectContext: string | null;
   }
 ): string {
   const parts: string[] = [];
 
-  const totalInsights =
-    insights.decisions.length +
-    insights.mistakes.length +
-    insights.corrections.length +
-    insights.keyContext.length;
+  const hasContent =
+    data.mentalModel ||
+    data.decisions.length > 0 ||
+    data.mistakes.length > 0 ||
+    data.corrections.length > 0 ||
+    data.reflectContext;
 
-  if (totalInsights === 0) {
+  if (!hasContent) {
     return '';
   }
 
@@ -195,35 +213,39 @@ function formatRestoredContext(
   parts.push('*The following context has been restored from memory after compaction:*');
   parts.push('');
 
-  if (insights.decisions.length > 0) {
+  if (data.mentalModel) {
+    parts.push('### Project Summary (from Mental Model)');
+    parts.push(data.mentalModel);
+    parts.push('');
+  }
+
+  if (data.decisions.length > 0) {
     parts.push('### Recent Decisions');
-    for (const decision of insights.decisions) {
+    for (const decision of data.decisions) {
       parts.push(`- ${decision}`);
     }
     parts.push('');
   }
 
-  if (insights.mistakes.length > 0) {
+  if (data.mistakes.length > 0) {
     parts.push('### Mistakes to Avoid');
-    for (const mistake of insights.mistakes) {
+    for (const mistake of data.mistakes) {
       parts.push(`- ${mistake}`);
     }
     parts.push('');
   }
 
-  if (insights.corrections.length > 0) {
+  if (data.corrections.length > 0) {
     parts.push('### Corrections Made');
-    for (const correction of insights.corrections) {
+    for (const correction of data.corrections) {
       parts.push(`- ${correction}`);
     }
     parts.push('');
   }
 
-  if (insights.keyContext.length > 0) {
-    parts.push('### Key Context');
-    for (const ctx of insights.keyContext) {
-      parts.push(`- ${ctx}`);
-    }
+  if (data.reflectContext) {
+    parts.push('### Current Work Context (synthesized)');
+    parts.push(data.reflectContext);
     parts.push('');
   }
 
@@ -320,25 +342,40 @@ async function main() {
     // Get project name
     const projectName = extractProjectName(cwd);
 
-    // Recall insights from Hindsight
-    const hindsightResponse = await recallInsights(projectName);
+    // Parallel fetch: mental model, tag-based recalls, and reflect for context
+    const [mentalModel, decisionResults, mistakeResults, correctionResults, reflectContext] = await Promise.all([
+      fetchMentalModel(projectName),
+      recallByTag(projectName, ['decision'], 1024),
+      recallByTag(projectName, ['mistake'], 1024),
+      recallByTag(projectName, ['correction'], 1024),
+      reflectForContext(projectName),
+    ]);
 
-    if (!hindsightResponse || hindsightResponse.count === 0) {
+    const decisions = extractTexts(decisionResults);
+    const mistakes = extractTexts(mistakeResults);
+    const corrections = extractTexts(correctionResults);
+
+    const hasAnything = mentalModel || decisions.length > 0 || mistakes.length > 0 || corrections.length > 0 || reflectContext;
+
+    if (!hasAnything) {
       log('No insights found in Hindsight');
       process.exit(0);
     }
 
-    log(`Found ${hindsightResponse.count} memories to restore context from`);
-
-    // Categorize insights
-    const categorized = categorizeInsights(hindsightResponse.results);
+    log(`Found: mental_model=${mentalModel ? 'yes' : 'no'}, ${decisions.length} decisions, ${mistakes.length} mistakes, ${corrections.length} corrections, reflect=${reflectContext ? 'yes' : 'no'}`);
 
     // Format and output
-    const output = formatRestoredContext(projectName, categorized);
+    const output = formatRestoredContext(projectName, {
+      mentalModel,
+      decisions,
+      mistakes,
+      corrections,
+      reflectContext,
+    });
 
     if (output) {
       console.log(output);
-      log(`Restored context: ${categorized.decisions.length} decisions, ${categorized.mistakes.length} mistakes, ${categorized.corrections.length} corrections, ${categorized.keyContext.length} key context`);
+      log(`Restored context successfully`);
     }
 
   } catch (error) {

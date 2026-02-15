@@ -2,9 +2,11 @@
   "mcpServers": {
     "hindsight-project": {
       "type": "http",
-      "url": "http://localhost:8889/mcp/${HINDSIGHT_PROJECT:-pai}/"
+      "url": "http://192.168.86.81:8889/mcp/pai/"
+    },
+    "hindsight-hedley": {
+      "type": "http",
+      "url": "http://192.168.86.81:8889/mcp/hedley/"
     }
   }
 }
-
-
