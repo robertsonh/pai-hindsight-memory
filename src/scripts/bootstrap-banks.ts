@@ -156,25 +156,25 @@ async function setupProjectBank(bankId: string): Promise<void> {
     {
       name: 'project-summary',
       source_query: 'What is this project, its architecture, key decisions, technology stack, and current state?',
-      tags: ['project', 'summary'],
+      tags: [],  // NOTE: tags cause all_strict filtering during refresh, excluding untagged memories
       max_tokens: 4096,
     },
     {
       name: 'coding-conventions',
       source_query: 'What coding conventions, patterns, style preferences, and best practices apply to this project?',
-      tags: ['project', 'conventions'],
+      tags: [],
       max_tokens: 2048,
     },
     {
       name: 'deployment-checklist',
       source_query: 'What are the deployment steps, configurations, environment variables, ports, and common gotchas for this project?',
-      tags: ['project', 'deployment'],
+      tags: [],
       max_tokens: 2048,
     },
     {
       name: 'known-issues',
       source_query: 'What known bugs, limitations, workarounds, and recurring problems exist in this project?',
-      tags: ['project', 'issues'],
+      tags: [],
       max_tokens: 2048,
     },
   ];
@@ -263,13 +263,13 @@ async function setupPersonalBank(bankId: string): Promise<void> {
     {
       name: 'about-me',
       source_query: 'Who am I? What are my key facts, preferences, background, work history, and personality traits?',
-      tags: ['personal', 'identity'],
+      tags: [],  // NOTE: tags cause all_strict filtering during refresh, excluding untagged memories
       max_tokens: 4096,
     },
     {
       name: 'my-goals',
       source_query: 'What are my current goals, plans, aspirations, and things I am working toward?',
-      tags: ['personal', 'goals'],
+      tags: [],
       max_tokens: 2048,
     },
   ];
