@@ -30,6 +30,9 @@
     "LICENSE"
   ],
   "scripts": {
+    "deploy": "bun run deploy.ts",
+    "deploy:dry": "bun run deploy.ts --dry",
+    "deploy:check": "bun run deploy.ts --check",
     "test:hooks": "bun test src/hooks/",
     "verify": "bash -c 'source VERIFY.md'"
   }
