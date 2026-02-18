@@ -50,7 +50,8 @@ async function main() {
         result.insights.decisions.length +
         result.insights.mistakes.length +
         result.insights.corrections.length +
-        result.insights.key_context.length;
+        result.insights.key_context.length +
+        (result.insights.personal_insights?.length || 0);
 
       log(LOG_PREFIX, `Extracted ${totalInsights} insights from ${result.processedLines} new lines`);
 

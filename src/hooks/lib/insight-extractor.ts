@@ -15,9 +15,10 @@ import { homedir } from 'os';
 // Configuration
 // ============================================================================
 
-const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.config', 'pai');
+const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.claude');
 const HINDSIGHT_URL = process.env.HINDSIGHT_PROJECT_URL || 'http://localhost:8889';
 const PROJECT_BANK = process.env.HINDSIGHT_PROJECT || 'project';
+const PERSONAL_BANK = process.env.HINDSIGHT_PERSONAL_BANK || 'hedley';
 
 // LLM Configuration (vLLM with OpenAI-compatible API)
 const LOCAL_LLM_URL = process.env.LOCAL_LLM_URL || 'http://uber.lan:11434';
@@ -82,6 +83,7 @@ export interface ExtractedInsights {
   mistakes: string[];
   corrections: string[];
   key_context: string[];
+  personal_insights: string[];
 }
 
 interface TranscriptEntry {
@@ -239,7 +241,9 @@ Analyze this conversation and extract:
 
 3. **CORRECTIONS**: Incorrect assumptions or misunderstandings that were corrected during the session. Include what was wrong and what the correct understanding is.
 
-4. **KEY_CONTEXT**: Important context about the project, codebase, or user preferences that was discovered or clarified. Things that would be valuable to know in future sessions.
+4. **KEY_CONTEXT**: Important context about the project or codebase that was discovered or clarified. Things that would be valuable to know in future sessions on THIS project.
+
+5. **PERSONAL_INSIGHTS**: Facts about the user (not the project) that would be valuable across ANY project. Preferences, opinions, frustrations, workflow habits, personal context. Examples: "User prefers bun over npm", "User gets frustrated by janky workarounds", "User values dark mode across all tools". Only include things that are clearly about the person, not about this specific codebase.
 
 For each category, provide clear, standalone statements that would make sense without the full conversation context. Be specific and include relevant details (file names, function names, etc.).
 
@@ -253,7 +257,8 @@ Respond with a JSON object in this exact format:
   "decisions": ["decision 1", "decision 2"],
   "mistakes": ["mistake 1", "mistake 2"],
   "corrections": ["correction 1", "correction 2"],
-  "key_context": ["context 1", "context 2"]
+  "key_context": ["context 1", "context 2"],
+  "personal_insights": ["insight 1", "insight 2"]
 }`;
 }
 
@@ -309,7 +314,12 @@ function parseInsightsResponse(responseText: string): ExtractedInsights | null {
   }
 
   try {
-    return JSON.parse(jsonStr.trim());
+    const parsed = JSON.parse(jsonStr.trim());
+    // Ensure personal_insights exists (backward compat with LLMs that may omit it)
+    if (!parsed.personal_insights) {
+      parsed.personal_insights = [];
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -486,7 +496,8 @@ async function analyzeChunk(
 
   if (insights) {
     const total = insights.decisions.length + insights.mistakes.length +
-                  insights.corrections.length + insights.key_context.length;
+                  insights.corrections.length + insights.key_context.length +
+                  insights.personal_insights.length;
     log(logPrefix, `Chunk ${chunkNum}: Extracted ${total} insights`);
     return insights;
   }
@@ -502,7 +513,8 @@ async function analyzeChunk(
     insights = parseInsightsResponse(responseText);
     if (insights) {
       const total = insights.decisions.length + insights.mistakes.length +
-                    insights.corrections.length + insights.key_context.length;
+                    insights.corrections.length + insights.key_context.length +
+                    insights.personal_insights.length;
       log(logPrefix, `Chunk ${chunkNum}: Retry succeeded - extracted ${total} insights`);
       return insights;
     }
@@ -522,6 +534,7 @@ function mergeInsights(allInsights: ExtractedInsights[]): ExtractedInsights {
     mistakes: [],
     corrections: [],
     key_context: [],
+    personal_insights: [],
   };
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').trim();
@@ -554,6 +567,13 @@ function mergeInsights(allInsights: ExtractedInsights[]): ExtractedInsights {
       if (!seen.has(key)) {
         seen.add(key);
         merged.key_context.push(context);
+      }
+    }
+    for (const insight of (insights.personal_insights || [])) {
+      const key = normalize(insight);
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.personal_insights.push(insight);
       }
     }
   }
@@ -614,9 +634,10 @@ export async function extractInsights(
 
   const merged = mergeInsights(allInsights);
   const totalInsights = merged.decisions.length + merged.mistakes.length +
-                        merged.corrections.length + merged.key_context.length;
+                        merged.corrections.length + merged.key_context.length +
+                        merged.personal_insights.length;
 
-  log(logPrefix, `Merged insights: ${merged.decisions.length} decisions, ${merged.mistakes.length} mistakes, ${merged.corrections.length} corrections, ${merged.key_context.length} context items`);
+  log(logPrefix, `Merged insights: ${merged.decisions.length} decisions, ${merged.mistakes.length} mistakes, ${merged.corrections.length} corrections, ${merged.key_context.length} context, ${merged.personal_insights.length} personal`);
 
   if (totalInsights === 0) {
     log(logPrefix, 'All chunks returned empty insights');
@@ -695,35 +716,83 @@ export async function storeInsights(
     });
   }
 
-  if (items.length === 0) {
+  // Personal insights go to the personal bank (hedley), not the project bank
+  const personalItems: typeof items = [];
+  for (const insight of (insights.personal_insights || [])) {
+    personalItems.push({
+      content: `PERSONAL INSIGHT (${dateStr}): ${insight}`,
+      context,
+      tags: ['personal', 'session-insight'],
+      timestamp,
+      metadata: { project: projectName, type: 'personal' },
+    });
+  }
+
+  if (items.length === 0 && personalItems.length === 0) {
     log(logPrefix, 'No insights to store');
     return false;
   }
 
-  try {
-    const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/memories`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        items,
-        document_id: `insights_${sessionId}`,
-        document_tags: ['session-insight', `session-${sessionId}`],
-        async: true,
-      }),
-    });
+  let projectOk = true;
+  let personalOk = true;
 
-    if (response.ok) {
-      log(logPrefix, `Successfully stored ${items.length} individual insights to bank "${PROJECT_BANK}" (${insights.decisions.length} decisions, ${insights.mistakes.length} mistakes, ${insights.corrections.length} corrections, ${insights.key_context.length} context)`);
-      return true;
-    } else {
-      const errorText = await response.text();
-      log(logPrefix, `Failed to store insights: ${response.status} - ${errorText.slice(0, 200)}`);
-      return false;
+  // Store project insights to project bank
+  if (items.length > 0) {
+    try {
+      const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PROJECT_BANK}/memories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items,
+          document_id: `insights_${sessionId}`,
+          document_tags: ['session-insight', `session-${sessionId}`],
+          async: true,
+        }),
+      });
+
+      if (response.ok) {
+        log(logPrefix, `Stored ${items.length} project insights to bank "${PROJECT_BANK}" (${insights.decisions.length} decisions, ${insights.mistakes.length} mistakes, ${insights.corrections.length} corrections, ${insights.key_context.length} context)`);
+      } else {
+        const errorText = await response.text();
+        log(logPrefix, `Failed to store project insights: ${response.status} - ${errorText.slice(0, 200)}`);
+        projectOk = false;
+      }
+    } catch (error) {
+      log(logPrefix, `Error storing project insights: ${error}`);
+      projectOk = false;
     }
-  } catch (error) {
-    log(logPrefix, `Error storing insights: ${error}`);
-    return false;
   }
+
+  // Store personal insights to personal bank
+  if (personalItems.length > 0) {
+    try {
+      const response = await fetch(`${HINDSIGHT_URL}/v1/default/banks/${PERSONAL_BANK}/memories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: personalItems,
+          document_id: `personal_insights_${sessionId}`,
+          document_tags: ['personal', 'session-insight', `session-${sessionId}`],
+          async: true,
+        }),
+      });
+
+      if (response.ok) {
+        log(logPrefix, `Stored ${personalItems.length} personal insights to bank "${PERSONAL_BANK}"`);
+      } else {
+        const errorText = await response.text();
+        log(logPrefix, `Failed to store personal insights: ${response.status} - ${errorText.slice(0, 200)}`);
+        personalOk = false;
+      }
+    } catch (error) {
+      log(logPrefix, `Error storing personal insights: ${error}`);
+      personalOk = false;
+    }
+  }
+
+  return projectOk && personalOk;
 }

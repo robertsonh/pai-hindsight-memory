@@ -24,7 +24,7 @@ import { spawn } from 'child_process';
 import { log } from './lib/insight-extractor';
 
 // Configuration
-const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.config', 'pai');
+const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.claude');
 const LOG_PREFIX = 'PreCompact';
 
 // ============================================================================
@@ -113,6 +113,7 @@ async function main() {
             PAI_DIR,
             HINDSIGHT_PROJECT_URL: process.env.HINDSIGHT_PROJECT_URL || 'http://localhost:8889',
             HINDSIGHT_PROJECT: process.env.HINDSIGHT_PROJECT || 'project',
+            HINDSIGHT_PERSONAL_BANK: process.env.HINDSIGHT_PERSONAL_BANK || 'hedley',
           },
         });
 

@@ -17,7 +17,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 
 // Configuration
-const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.config', 'pai');
+const PAI_DIR = process.env.PAI_DIR || join(homedir(), '.claude');
 const HINDSIGHT_URL = process.env.HINDSIGHT_PROJECT_URL || 'http://localhost:8889';
 const PERSONAL_BANK = process.env.HINDSIGHT_PERSONAL_BANK || 'hedley';
 const PROJECT_BANK = process.env.HINDSIGHT_PROJECT || 'project';
